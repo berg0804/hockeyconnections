@@ -3,15 +3,13 @@ import pandas as pd
 from unidecode import unidecode
 import networkx as nx
 df = pd.read_csv("teams_.csv")
-df1 = df[["Player", "Team", "Season", "GP", "A", "G"]]
+df1 = df[["Player", "Team", "Season", "GP"]]
 df1["Team2"] = df["Team"] + " " + df["Season"]
 
 data = {
     "Player": list(df1["Player"]),
     "Team2": list(df1["Team2"]),
     "GP": list(df1["GP"]),
-    "A": list(df1["A"]),
-    "G": list(df1["G"]),
 }
 df_new = pd.DataFrame(data)
 df_new["Player"] = df_new["Player"].astype("string")
@@ -123,75 +121,61 @@ df['Team'] = df['Team'].replace('TRS', 'MAPLE LEAFS')
 df['Team'] = df['Team'].replace('UTA', 'MAMMOTH')
 df['Team'] = df['Team'].replace('VAN', 'CANUCKS')
 df['Team'] = df['Team'].replace('VEG', 'GOLDEN KNIGHTS')
-df['Team'] = df['Team'].replace('WSH', 'GOLDEN KNIGHTS')
+df['Team'] = df['Team'].replace('WSH', 'CAPITALS')
 teams = sorted(df["Team"].dropna().unique())
 
 
 
 # Streamlit UI
-# Two dropdowns with same choices
 st.title("Players Who Played for Both Teams")
 
 teams = sorted(df["Team"].unique())
-options = teams + ["GP > 500 (Career)", "A > 500 (Career)", "A > 50 (Season)", "G > 500 (Career)"]
+options = teams + ["GP > 50"]
 
-# Dropdown menus
-st.title("Players Who Played for Both Teams or Met Stat Criteria")
-team1 = st.selectbox("Select Team 1 or Stat Filter", options)
-team2 = st.selectbox("Select Team 2 or Stat Filter", options, index=1)
+
+# Two dropdowns with same choices
+team1 = st.selectbox("Select Team 1 or GP Filter", options)
+team2 = st.selectbox("Select Team 2 or GP Filter", options, index=1)
 
 if st.button("Find Players"):
     if team1 == team2:
         st.warning("Please select two different options.")
     else:
-        # ----------- TEAM 1 -----------
-        if team1 == "GP > 500 (Career)":
-            gp1_players = df.groupby("Player")["GP"].sum().reset_index()
-            gp1_players = gp1_players[gp1_players["GP"] > 500]
-            df_team1 = df[df["Player"].isin(gp1_players["Player"])]
-        elif team1 == "A > 50 (Season)":
-            if team2 in teams:
-                df_team1 = df[(df["Team"] == team2) & (df["A"] > 50)]
-            else:
-                df_team1 = df[df["A"] > 50]
-        if team1 == "G > 500 (Career)":
-            g1_players = df.groupby("Player")["G"].sum().reset_index()
-            g1_players = g1_players[g1_players["G"] > 500]
-            df_team1 = df[df["Player"].isin(g1_players["Player"])]                
-        else:
+        # Handle GP filter and team filtering
+        df_team1 = df.copy()
+        if team1 != "GP > 50":
             df_team1 = df[df["Team"] == team1]
+        if team1 == "GP > 50":
+            gp1_players = df.groupby("Player")["GP"].sum().reset_index()
+            gp1_players = gp1_players[gp1_players["GP"] > 50]
+            df_team1 = df[df["Player"].isin(gp1_players["Player"])]
 
-        # ----------- TEAM 2 -----------
-        if team2 == "GP > 500 (Career)":
-            gp2_players = df.groupby("Player")["GP"].sum().reset_index()
-            gp2_players = gp2_players[gp2_players["GP"] > 500]
-            df_team2 = df[df["Player"].isin(gp2_players["Player"])]
-        elif team2 == "A > 50 (Season)":
-            if team1 in teams:
-                df_team2 = df[(df["Team"] == team1) & (df["A"] > 50)]
-            else:
-                df_team2 = df[df["A"] > 50]
-        if team2 == "G > 500 (Career)":
-            g2_players = df.groupby("Player")["G"].sum().reset_index()
-            g2_players = g2_players[g2_players["G"] > 500]
-            df_team2 = df[df["Player"].isin(g2_players["Player"])]                  
-        else:
+        df_team2 = df.copy()
+        if team2 != "GP > 50":
             df_team2 = df[df["Team"] == team2]
+        if team2 == "GP > 50":
+            gp2_players = df.groupby("Player")["GP"].sum().reset_index()
+            gp2_players = gp2_players[gp2_players["GP"] > 50]
+            df_team2 = df[df["Player"].isin(gp2_players["Player"])]
 
-        # ----------- INTERSECTION -----------
+        # Find players that meet both criteria
         players1 = set(df_team1["Player"])
         players2 = set(df_team2["Player"])
         common_players = players1.intersection(players2)
 
         if common_players:
+            # Filter full data for just those players
             filtered_df = df[df["Player"].isin(common_players)]
+
+            # Show total GP for summary
             summary = (
-                filtered_df.groupby("Player")[["GP", "A"]]
+                filtered_df.groupby("Player")["GP"]
                 .sum()
                 .reset_index()
-                .rename(columns={"GP": "Total GP", "A": "Total A"})
+                .rename(columns={"GP": "Total GP"})
                 .sort_values(by="Total GP", ascending=True)
             )
+
             st.success(f"{len(summary)} players found who match both selections:")
             st.dataframe(summary)
         else:
